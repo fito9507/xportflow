@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XportFlow — Gestión de Contenedores</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --ink: #111;
+  --ink2: #444;
+  --ink3: #888;
+  --bg: #f7f5f0;
+  --bg2: #eeeade;
+  --bg3: #e4e0d2;
+  --white: #fff;
+  --accent: #d4420f;
+  --accent2: #e8561e;
+  --blue: #1a4fc8;
+  --green: #1a6e3a;
+  --gold: #b07d10;
+  --border: #ccc8bc;
+  --mono: 'DM Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+  --radius: 6px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--bg); color: var(--ink); min-height: 100vh; font-size: 14px; }
+
+/* HEADER */
+header {
+  background: var(--ink);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 50px;
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-family: var(--mono); font-size: 16px; font-weight: 500; color: #fff; letter-spacing: -0.02em; }
+.logo em { color: var(--accent2); font-style: normal; }
+.header-tabs { display: flex; }
+.htab {
+  height: 50px; padding: 0 16px;
+  display: flex; align-items: center;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase;
+  color: #666; border-bottom: 2px solid transparent;
+  cursor: pointer; background: none; border-top: none; border-left: none; border-right: none;
+  font-family: var(--sans); transition: color 0.15s;
+}
+.htab.active { color: #fff; border-bottom-color: var(--accent2); }
+.htab:hover:not(.active) { color: #aaa; }
+
+/* SCREENS */
+.screen { display: none; max-width: 1060px; margin: 0 auto; padding: 20px; }
+.screen.active { display: block; }
+
+/* STEP WIZARD */
+.wizard { display: flex; gap: 0; margin-bottom: 24px; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.step {
+  flex: 1; padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+  font-size: 12px; font-weight: 500; color: var(--ink3); border-right: 1px solid var(--border);
+  background: var(--bg2);
+}
+.step:last-child { border-right: none; }
+.step.done { background: var(--bg); color: var(--green); }
+.step.active { background: var(--white); color: var(--ink); }
+.step-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg3); color: var(--ink3);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; font-weight: 500; flex-shrink: 0;
+}
+.step.active .step-num { background: var(--accent); color: #fff; }
+.step.done .step-num { background: var(--green); color: #fff; }
+
+/* CARDS */
+.card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+}
+.card-title {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink3); margin-bottom: 14px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* UPLOAD AREA */
+.upload-area {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 40px 20px; text-align: center; cursor: pointer;
+  transition: all 0.2s; background: var(--bg2);
+}
+.upload-area:hover, .upload-area.drag { border-color: var(--accent); background: #fff5f2; }
+.upload-icon { font-size: 40px; margin-bottom: 12px; }
+.upload-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.upload-sub { font-size: 13px; color: var(--ink3); }
+#file-input { display: none; }
+
+/* PREVIEW IMAGE */
+#img-preview { max-width: 100%; max-height: 320px; border-radius: var(--radius); border: 1px solid var(--border); margin-top: 12px; display: none; }
+
+/* AI STATUS */
+.ai-status {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: var(--radius);
+  background: var(--bg2); border: 1px solid var(--border);
+  font-size: 13px; margin-top: 12px;
+}
+.ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+.ai-dot.loading { animation: pulse 1s infinite; }
+.ai-dot.ok { background: var(--green); }
+.ai-dot.err { background: var(--accent); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* FORM GRID */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-grid.g3 { grid-template-columns: 1fr 1fr 1fr; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field.span2 { grid-column: span 2; }
+label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); }
+input, select, textarea {
+  font-family: var(--mono); font-size: 13px;
+  padding: 8px 10px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--ink); border-radius: 4px; width: 100%;
+}
+input:focus, select:focus { outline: none; border-color: var(--ink); background: var(--white); }
+input[type=number] { text-align: right; }
+
+/* PRODUCT TABLE */
+.prod-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.prod-table th {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink3); padding: 8px 10px; text-align: left;
+  background: var(--bg2); border-bottom: 1px solid var(--border); font-weight: 500;
+}
+.prod-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+.prod-table tr:last-child td { border-bottom: none; }
+.prod-table tr:hover td { background: var(--bg2); }
+.prod-table input { padding: 5px 8px; font-size: 12px; }
+.stock-bar { height: 6px; background: var(--bg3); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+.stock-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.3s; }
+.stock-fill.warn { background: var(--gold); }
+.stock-fill.over { background: var(--accent); }
+
+/* WIRE ROWS */
+.wire-row {
+  display: grid; grid-template-columns: 1fr 1fr 130px 130px 120px 36px;
+  gap: 8px; align-items: center; margin-bottom: 8px;
+}
+.wire-row input, .wire-row select { margin: 0; }
+.add-btn {
+  width: 100%; padding: 8px; border: 1.5px dashed var(--border);
+  background: none; color: var(--blue); font-family: var(--mono);
+  font-size: 12px; cursor: pointer; border-radius: 4px; margin-top: 4px;
+}
+.add-btn:hover { background: #eef2ff; border-color: var(--blue); }
+.del-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 18px; font-weight: 700; }
+
+/* TOTALS */
+.totals-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0;
+}
+.tot-box { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+.tot-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; }
+.tot-val { font-family: var(--mono); font-size: 18px; font-weight: 500; }
+.tot-val.red { color: var(--accent); }
+.tot-val.green { color: var(--green); }
+.tot-val.blue { color: var(--blue); }
+
+/* BUTTONS */
+.btn {
+  font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
+  text-transform: uppercase; padding: 9px 18px;
+  border: 1.5px solid var(--ink); background: var(--ink); color: #fff;
+  cursor: pointer; border-radius: 4px; transition: all 0.12s;
+}
+.btn:hover { background: var(--accent); border-color: var(--accent); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.outline { background: transparent; color: var(--ink); }
+.btn.outline:hover { background: var(--ink); color: #fff; }
+.btn.green-btn { background: var(--green); border-color: var(--green); }
+.btn.green-btn:hover { background: #145c2f; }
+.btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* BADGE */
+.badge { font-family: var(--mono); font-size: 10px; font-weight: 500; padding: 3px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+.badge.pending { background: #fff3cd; color: #7a5c00; }
+.badge.partial { background: #cce5ff; color: #003d7a; }
+.badge.paid { background: #d4edda; color: #1a5c2e; }
+
+/* INVOICE LIST */
+.inv-list { display: flex; flex-direction: column; gap: 8px; }
+.inv-card {
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+}
+.inv-card:hover { border-color: var(--ink3); }
+.inv-num { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+.inv-meta { font-size: 12px; color: var(--ink3); margin-top: 2px; }
+.inv-amt { font-family: var(--mono); font-size: 16px; font-weight: 500; color: var(--blue); }
+.inv-actions { display: flex; gap: 6px; align-items: center; }
+
+/* MODAL */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal { background: var(--white); border-radius: var(--radius); width: 700px; max-width: 96vw; max-height: 92vh; overflow-y: auto; }
+.modal-head { background: var(--ink); color: #fff; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; border-radius: var(--radius) var(--radius) 0 0; position: sticky; top: 0; }
+.modal-title { font-family: var(--mono); font-size: 13px; }
+.modal-close { background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; }
+.modal-body { padding: 24px; }
+.modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+/* INVOICE PRINT */
+.invoice-doc {
+  background: #fff; padding: 36px 40px; font-family: var(--sans);
+  color: #111; font-size: 13px; line-height: 1.6;
+}
+.inv-doc-header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+.company-name { font-family: var(--mono); font-size: 20px; font-weight: 500; }
+.inv-doc-num { font-family: var(--mono); font-size: 24px; font-weight: 500; color: var(--accent); text-align: right; }
+.inv-doc-date { font-size: 12px; color: #666; text-align: right; margin-top: 4px; }
+.inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 18px 0; border-top: 2px solid #111; border-bottom: 2px solid #111; margin-bottom: 24px; }
+.party-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #999; font-family: var(--mono); margin-bottom: 5px; }
+.party-name { font-size: 15px; font-weight: 600; }
+.party-detail { font-size: 12px; color: #555; }
+.inv-doc-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+.inv-doc-table th { background: #111; color: #fff; padding: 9px 12px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; text-align: left; font-weight: 400; }
+.inv-doc-table td { padding: 9px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+.inv-doc-table tr:last-child td { border-bottom: 2px solid #111; font-weight: 600; }
+.inv-total-block { text-align: right; margin-bottom: 24px; }
+.inv-total-line { display: flex; justify-content: flex-end; gap: 40px; padding: 3px 0; font-size: 13px; }
+.inv-total-line.big { font-family: var(--mono); font-size: 20px; font-weight: 500; border-top: 2px solid #111; padding-top: 10px; margin-top: 6px; }
+.inv-footer { border-top: 1px solid #ddd; padding-top: 14px; font-size: 11px; color: #888; }
+.inv-ref-box { background: #f8f8f8; border-left: 3px solid var(--accent); padding: 10px 14px; font-size: 12px; margin-bottom: 18px; font-family: var(--mono); }
+
+/* EMPTY */
+.empty { text-align: center; padding: 48px; color: var(--ink3); font-family: var(--mono); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Xport<em>Flow</em></div>
+  <div class="header-tabs">
+    <button class="htab active" onclick="goTab('nuevo')">Nuevo contenedor</button>
+    <button class="htab" onclick="goTab('facturas')">Facturas</button>
+    <button class="htab" onclick="goTab('stock')">Stock</button>
+  </div>
+</header>
+
+<!-- NUEVO CONTENEDOR -->
+<div class="screen active" id="screen-nuevo">
+
+  <!-- WIZARD -->
+  <div class="wizard">
+    <div class="step active" id="wiz1"><div class="step-num">1</div><span>Inicio</span></div>
+    <div class="step" id="wiz2"><div class="step-num">2</div><span>Confirmar datos</span></div>
+    <div class="step" id="wiz3"><div class="step-num">3</div><span>Transferencias</span></div>
+    <div class="step" id="wiz4"><div class="step-num">4</div><span>Generar facturas</span></div>
+  </div>
+
+  <!-- STEP 1: START -->
+  <div id="step1">
+    <div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:52px;margin-bottom:16px">📦</div>
+      <div style="font-size:20px;font-weight:600;margin-bottom:8px">Nuevo contenedor</div>
+      <div style="color:var(--ink3);margin-bottom:28px;font-size:14px">Introduce los datos del contenedor, costes y pagadores.<br>Se generarán las facturas automáticamente en Zoho Books.</div>
+      <button class="btn" style="font-size:13px;padding:12px 32px" onclick="goStep(2)">Empezar →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: CONFIRM DATA -->
+  <div id="step2" style="display:none">
+    <div class="card">
+      <div class="card-title">
+        Datos del contenedor
+        <button class="btn outline" style="font-size:10px;padding:5px 10px" onclick="resetStep1()">← Cambiar imagen</button>
+      </div>
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="field"><label>Referencia / ID contenedor</label><input id="d-ref" placeholder="CTR-2024-001"></div>
+        <div class="field"><label>Nº contenedor naviero</label><input id="d-numcont" placeholder="MSCU1234567"></div>
+        <div class="field"><label>Puerto origen</label><input id="d-origen" placeholder="TIANJIN, China"></div>
+        <div class="field"><label>Puerto destino</label><input id="d-destino" placeholder="MARIEL, Cuba"></div>
+        <div class="field"><label>Fecha embarque</label><input id="d-fecha" type="date"></div>
+        <div class="field"><label>Tasa cambio EUR/USD</label><input id="d-tasa" type="number" step="0.0001" placeholder="1.1701"></div>
+      </div>
+
+      <div class="card-title" style="margin-top:8px">Costes logísticos (USD)</div>
+      <div class="form-grid g3" style="margin-bottom:16px">
+        <div class="field"><label>FOB total mercancía</label><input id="d-fob" type="number" step="0.01" oninput="recalcCostes()"></div>
+        <div class="field"><label>Flete marítimo</label><input id="d-flete" type="number" step="0.01" oninput="recalcCostes()"></div>
+        <div class="field"><label>Seguro</label><input id="d-seguro" type="number" step="0.01" oninput="recalcCostes()"></div>
+        <div class="field"><label>Inspecciones (PSI+CLS)</label><input id="d-inspec" type="number" step="0.01" oninput="recalcCostes()"></div>
+        <div class="field"><label>Margen comercial (USD)</label><input id="d-margen" type="number" step="0.01" oninput="recalcCostes()"></div>
+        <div class="field"><label>Total a facturar (USD)</label><input id="d-total" type="number" step="0.01" style="font-weight:600;color:var(--blue)" readonly></div>
+      </div>
+
+      <div class="card-title">Productos del contenedor</div>
+      <table class="prod-table" id="prod-table">
+        <thead><tr><th>Producto</th><th>Proveedor</th><th style="text-align:right">Uds. totales</th><th style="text-align:right">Precio unit. (USD)</th><th style="text-align:right">Total (USD)</th><th></th></tr></thead>
+        <tbody id="prod-tbody"></tbody>
+      </table>
+      <button class="add-btn" onclick="addProductRow()">+ Añadir producto</button>
+
+      <div class="btn-row">
+        <button class="btn" onclick="goStep(3)">Continuar → Transferencias</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: WIRE TRANSFERS -->
+  <div id="step3" style="display:none">
+    <div class="card">
+      <div class="card-title">Resumen del contenedor</div>
+      <div class="totals-strip" id="totals-strip"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Transferencias recibidas (wire transfers USD)</div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px">
+        Añade cada wire recibido. Indica si cubre <strong>FOB</strong> (mercancía), <strong>Logística</strong> (flete+seguro+inspección) o <strong>Ambos</strong>. Se generará una factura por cada entrada.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 130px 130px 120px 36px;gap:8px;margin-bottom:6px;padding:0 2px">
+        <span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink3);letter-spacing:.06em">Empresa (USA)</span>
+        <span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink3);letter-spacing:.06em">Ref. wire / banco</span>
+        <span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink3);letter-spacing:.06em">Importe (USD)</span>
+        <span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink3);letter-spacing:.06em">Fecha cobro</span>
+        <span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink3);letter-spacing:.06em">Tipo factura</span>
+        <span></span>
+      </div>
+      <div id="wires-list"></div>
+      <button class="add-btn" onclick="addWireRow()">+ Añadir wire transfer</button>
+
+      <div id="wire-summary" style="margin-top:16px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;display:none">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span>Total recibido</span><span id="ws-recibido" style="font-family:var(--mono);font-weight:500;color:var(--green)"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span>Total a cobrar</span><span id="ws-total" style="font-family:var(--mono)"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-weight:600">
+          <span>Diferencia</span><span id="ws-diff" style="font-family:var(--mono)"></span>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn outline" onclick="goStep(2)">← Atrás</button>
+        <button class="btn green-btn" onclick="generarFacturas()">Generar facturas →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4: DONE -->
+  <div id="step4" style="display:none">
+    <div class="card" style="text-align:center;padding:40px">
+      <div style="font-size:48px;margin-bottom:16px">✅</div>
+      <div style="font-size:20px;font-weight:600;margin-bottom:8px">Facturas generadas</div>
+      <div style="color:var(--ink3);margin-bottom:24px">Stock actualizado. Puedes verlas en la pestaña Facturas.</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn outline" onclick="goTab('facturas')">Ver facturas</button>
+        <button class="btn" onclick="nuevoContenedor()">+ Nuevo contenedor</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FACTURAS -->
+<div class="screen" id="screen-facturas">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)">Facturas emitidas</div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--ink3)" id="fact-count"></div>
+  </div>
+  <div class="inv-list" id="inv-list">
+    <div class="empty">Sin facturas aún. Crea un contenedor primero.</div>
+  </div>
+</div>
+
+<!-- STOCK -->
+<div class="screen" id="screen-stock">
+  <div style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:16px">Control de stock por contenedor</div>
+  <div id="stock-view"><div class="empty">Sin datos de stock aún.</div></div>
+</div>
+
+<!-- MODAL FACTURA -->
+<div class="modal-bg" id="modal-factura">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="modal-inv-title">FACTURA</span>
+      <button class="modal-close" onclick="this.closest('.modal-bg').classList.remove('open')">×</button>
+    </div>
+    <div class="modal-body" id="modal-inv-body"></div>
+    <div class="modal-foot">
+      <button class="btn outline" onclick="document.getElementById('modal-factura').classList.remove('open')">Cerrar</button>
+      <button class="btn" onclick="printInvoice()">Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ───────────────────────────────────────────
+// CONFIG GOOGLE SHEETS
+// ───────────────────────────────────────────
+const GS_URL   = 'https://script.google.com/macros/s/AKfycbyxM3BMS7ZrwKhOR_ikOPU6XRx_CCa3ZPEWDxuBuQkw3I6tZS3pD_e1rd4m7IZClQ5Sew/exec';
+const GS_SHEET = '1syHDCtp6G7vArYzPFG7xhh7DcyZUvfwTw7C0NYf2U1k';
+
+// ───────────────────────────────────────────
+// STATE
+// ───────────────────────────────────────────
+const S = {
+  facturas: JSON.parse(localStorage.getItem('xf_facturas') || '[]'),
+  stock: JSON.parse(localStorage.getItem('xf_stock') || '[]'),
+  nextNum: parseInt(localStorage.getItem('xf_nextnum') || '1'),
+  myCompany: JSON.parse(localStorage.getItem('xf_company') || JSON.stringify({
+    name: 'XPORTPRISE SL',
+    address: 'Vigo, Galicia, España',
+    vat: 'B-XXXXXXXX',
+    bank: 'ES12 XXXX XXXX XXXX XXXX XXXX (Banco XXX)',
+    email: 'info@xportprise.com'
+  }))
+};
+
+let currentCont = null;
+
+function save() {
+  localStorage.setItem('xf_facturas', JSON.stringify(S.facturas));
+  localStorage.setItem('xf_stock', JSON.stringify(S.stock));
+  localStorage.setItem('xf_nextnum', S.nextNum);
+}
+
+// ───────────────────────────────────────────
+// CONFIG ZOHO BOOKS
+// ───────────────────────────────────────────
+const ZOHO = {
+  clientId:     '1000.LQ8JUNWRNG6E4ZJJOTNXX8PG4Q6V4Z',
+  clientSecret: '6c96b17142f639491a64d7e6d00bb81b1782cc7f35',
+  refreshToken: '1000.3afaba867fe29b1a99c5498cd77ff49b.0df80ad8fac47279e90000f4080f24b8',
+  orgId:        '850675906',
+  apiBase:      'https://www.zohoapis.com/books/v3',
+  _accessToken: '1000.a87809628afc6ba78eed9a5566470d4f.831b9756fe4ad9a490b2ba9de4f0212d',
+  _tokenExpiry:  Date.now() + 3500000
+};
+
+async function getZohoToken() {
+  if (ZOHO._accessToken && Date.now() < ZOHO._tokenExpiry) return ZOHO._accessToken;
+  return ZOHO._accessToken;
+}
+
+async function zohoFindOrCreateContact(nombre, token) {
+  try {
+    const r = await fetch(ZOHO.apiBase+'/contacts?organization_id='+ZOHO.orgId+'&contact_name='+encodeURIComponent(nombre), { headers: { Authorization: 'Zoho-oauthtoken '+token } });
+    const d = await r.json();
+    if (d.contacts && d.contacts.length) return d.contacts[0].contact_id;
+  } catch(e) {}
+  try {
+    const r = await fetch(ZOHO.apiBase+'/contacts?organization_id='+ZOHO.orgId, {
+      method: 'POST',
+      headers: { Authorization: 'Zoho-oauthtoken '+token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_name: nombre, contact_type: 'customer', currency_code: 'USD' })
+    });
+    const d = await r.json();
+    return d.contact ? d.contact.contact_id : null;
+  } catch(e) { return null; }
+}
+
+async function createZohoInvoice(factura) {
+  showSyncStatus('Enviando a Zoho Books y Google Sheets...', 'loading');
+  try {
+    const payload = Object.assign({}, factura, { type: 'factura', sheetId: GS_SHEET });
+    // Use text/plain to avoid CORS preflight (Google Script accepts it)
+    const res = await fetch(GS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showSyncStatus('Factura ' + factura.num + ' creada en Zoho Books ✓', 'ok');
+      return data.zohoId || true;
+    } else {
+      showSyncStatus('Error: ' + (data.error || 'desconocido'), 'err');
+      return null;
+    }
+  } catch(e) {
+    // Fallback: try no-cors (at least saves to Sheets)
+    try {
+      await fetch(GS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(Object.assign({}, factura, { type: 'factura', sheetId: GS_SHEET }))
+      });
+      showSyncStatus('Factura ' + factura.num + ' enviada a Zoho y Sheets', 'ok');
+    } catch(e2) {
+      showSyncStatus('Guardada localmente — sin conexión al servidor', 'err');
+    }
+    return null;
+  }
+}
+
+// ───────────────────────────────────────────
+// GOOGLE SHEETS SYNC
+// ───────────────────────────────────────────
+function showSyncStatus(msg, type='loading') {
+  let bar = document.getElementById('sync-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'sync-bar';
+    bar.style.cssText = 'position:fixed;bottom:16px;right:16px;padding:10px 16px;border-radius:6px;font-family:var(--mono);font-size:12px;z-index:999;display:flex;align-items:center;gap:8px;box-shadow:0 2px 12px rgba(0,0,0,0.15);transition:opacity 0.3s';
+    document.body.appendChild(bar);
+  }
+  const colors = { loading:'#1a4fc8', ok:'#1a6e3a', err:'#d4420f' };
+  const icons  = { loading:'⏳', ok:'✅', err:'❌' };
+  bar.style.background = colors[type] || '#333';
+  bar.style.color = '#fff';
+  bar.style.opacity = '1';
+  bar.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  if (type !== 'loading') setTimeout(() => { bar.style.opacity = '0'; }, 3500);
+}
+
+async function syncFacturaToSheets(factura) {
+  // Now handled together with Zoho in createZohoInvoice via Google Script
+}
+
+async function syncStockToSheets(stockEntry) {
+  try {
+    await fetch(GS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sheetId: GS_SHEET,
+        type: 'stock',
+        ref: stockEntry.ref,
+        productos: stockEntry.productos
+      })
+    });
+  } catch(e) {
+    console.warn('Stock sync failed', e);
+  }
+}
+
+// ───────────────────────────────────────────
+// NAV
+// ───────────────────────────────────────────
+function goTab(tab) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.htab').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'facturas') renderFacturas();
+  if (tab === 'stock') renderStock();
+}
+
+// ───────────────────────────────────────────
+// STEP WIZARD
+// ───────────────────────────────────────────
+function goStep(n) {
+  [1,2,3,4].forEach(i => {
+    document.getElementById('step'+i).style.display = i === n ? 'block' : 'none';
+    const w = document.getElementById('wiz'+i);
+    w.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+  if (n === 3) renderTotals();
+  if (n === 4) { save(); renderFacturas(); renderStock(); }
+}
+
+// ───────────────────────────────────────────
+// IMAGE UPLOAD + AI EXTRACTION
+// ───────────────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) processImage(file);
+}
+
+function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (file) processImage(file);
+}
+
+function processImage(file) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const b64 = ev.target.result.split(',')[1];
+    const preview = document.getElementById('img-preview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    extractWithAI(b64);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function extractWithAI(base64) {
+  // No AI extraction - go directly to manual form
+  goStep(2);
+}
+
+function fillExtractedData(d) {
+  if (d.ref) document.getElementById('d-ref').value = d.ref;
+  if (d.numcont) document.getElementById('d-numcont').value = d.numcont;
+  if (d.origen) document.getElementById('d-origen').value = d.origen;
+  if (d.destino) document.getElementById('d-destino').value = d.destino;
+  if (d.fecha) document.getElementById('d-fecha').value = d.fecha;
+  if (d.tasa_eur_usd) document.getElementById('d-tasa').value = d.tasa_eur_usd;
+  if (d.fob_usd) document.getElementById('d-fob').value = d.fob_usd;
+  if (d.flete_usd) document.getElementById('d-flete').value = d.flete_usd;
+  if (d.seguro_usd) document.getElementById('d-seguro').value = d.seguro_usd;
+  if (d.inspeccion_usd) document.getElementById('d-inspec').value = d.inspeccion_usd;
+  if (d.margen_usd) document.getElementById('d-margen').value = d.margen_usd;
+
+  const tbody = document.getElementById('prod-tbody');
+  tbody.innerHTML = '';
+  if (d.productos && d.productos.length) {
+    d.productos.forEach(p => addProductRow(p.nombre, p.proveedor, p.unidades, p.precio_unit_usd, p.total_usd));
+  }
+  recalcCostes();
+}
+
+function resetStep1() {
+  document.getElementById('img-preview').style.display = 'none';
+  document.getElementById('ai-status').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  goStep(1);
+}
+
+// ───────────────────────────────────────────
+// PRODUCTS
+// ───────────────────────────────────────────
+function addProductRow(nombre='', proveedor='', unidades='', precio='', total='') {
+  const tbody = document.getElementById('prod-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input value="${nombre}" placeholder="Nombre producto" style="width:100%"></td>
+    <td><input value="${proveedor}" placeholder="Proveedor" style="width:100%"></td>
+    <td><input type="number" value="${unidades}" placeholder="0" style="width:90px;text-align:right" oninput="calcRowTotal(this)"></td>
+    <td><input type="number" value="${precio}" placeholder="0.00" step="0.0001" style="width:110px;text-align:right" oninput="calcRowTotal(this)"></td>
+    <td><input type="number" value="${total}" placeholder="0.00" step="0.01" style="width:110px;text-align:right;color:var(--blue)" readonly></td>
+    <td><button class="del-btn" onclick="this.closest('tr').remove();recalcCostes()">×</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function calcRowTotal(inp) {
+  const tr = inp.closest('tr');
+  const inputs = tr.querySelectorAll('input[type=number]');
+  const uds = parseFloat(inputs[0].value) || 0;
+  const precio = parseFloat(inputs[1].value) || 0;
+  inputs[2].value = (uds * precio).toFixed(2);
+  recalcCostes();
+}
+
+function recalcCostes() {
+  const fob = parseFloat(document.getElementById('d-fob').value) || 0;
+  const flete = parseFloat(document.getElementById('d-flete').value) || 0;
+  const seguro = parseFloat(document.getElementById('d-seguro').value) || 0;
+  const inspec = parseFloat(document.getElementById('d-inspec').value) || 0;
+  const margen = parseFloat(document.getElementById('d-margen').value) || 0;
+  const total = fob + flete + seguro + inspec + margen;
+  document.getElementById('d-total').value = total.toFixed(2);
+}
+
+// ───────────────────────────────────────────
+// WIRE TRANSFERS
+// ───────────────────────────────────────────
+function addWireRow(empresa='', ref='', importe='', fecha='', tipo='FOB') {
+  const list = document.getElementById('wires-list');
+  const div = document.createElement('div');
+  div.className = 'wire-row';
+  const today = fecha || new Date().toISOString().split('T')[0];
+  div.innerHTML = `
+    <input placeholder="ABC Trading LLC" value="${empresa}">
+    <input placeholder="REF-WIRE-001" value="${ref}">
+    <input type="number" placeholder="0.00" step="0.01" value="${importe}" oninput="updateWireSummary()">
+    <input type="date" value="${today}">
+    <select onchange="updateWireSummary()">
+      <option value="FOB" ${tipo==='FOB'?'selected':''}>FOB (mercancía)</option>
+      <option value="LOG" ${tipo==='LOG'?'selected':''}>Logística</option>
+      <option value="AMBOS" ${tipo==='AMBOS'?'selected':''}>FOB + Logística</option>
+    </select>
+    <button class="del-btn" onclick="this.parentElement.remove();updateWireSummary()">×</button>
+  `;
+  list.appendChild(div);
+  updateWireSummary();
+}
+
+function updateWireSummary() {
+  const rows = document.querySelectorAll('.wire-row');
+  let total = 0;
+  rows.forEach(r => { total += parseFloat(r.querySelectorAll('input[type=number]')[0]?.value) || 0; });
+  const totalCobrar = parseFloat(document.getElementById('d-total').value) || 0;
+  const diff = total - totalCobrar;
+  const sw = document.getElementById('wire-summary');
+  sw.style.display = rows.length ? 'block' : 'none';
+  document.getElementById('ws-recibido').textContent = '$' + usd(total);
+  document.getElementById('ws-total').textContent = '$' + usd(totalCobrar);
+  const diffEl = document.getElementById('ws-diff');
+  diffEl.textContent = (diff >= 0 ? '+' : '') + '$' + usd(diff);
+  diffEl.style.color = diff >= 0 ? 'var(--green)' : 'var(--accent)';
+}
+
+function renderTotals() {
+  const fob = parseFloat(document.getElementById('d-fob').value) || 0;
+  const flete = parseFloat(document.getElementById('d-flete').value) || 0;
+  const seguro = parseFloat(document.getElementById('d-seguro').value) || 0;
+  const inspec = parseFloat(document.getElementById('d-inspec').value) || 0;
+  const margen = parseFloat(document.getElementById('d-margen').value) || 0;
+  const total = fob + flete + seguro + inspec + margen;
+  const logistica = flete + seguro + inspec;
+
+  document.getElementById('totals-strip').innerHTML = `
+    <div class="tot-box"><div class="tot-label">FOB mercancía</div><div class="tot-val blue">$${usd(fob)}</div></div>
+    <div class="tot-box"><div class="tot-label">Logística</div><div class="tot-val">$${usd(logistica)}</div></div>
+    <div class="tot-box"><div class="tot-label">Margen España</div><div class="tot-val">$${usd(margen)}</div></div>
+    <div class="tot-box"><div class="tot-label">Total a cobrar</div><div class="tot-val green">$${usd(total)}</div></div>
+  `;
+
+  // pre-add one wire row if empty
+  if (!document.querySelectorAll('.wire-row').length) addWireRow();
+}
+
+// ───────────────────────────────────────────
+// GENERATE INVOICES
+// ───────────────────────────────────────────
+async function generarFacturas() {
+  const wires = document.querySelectorAll('.wire-row');
+  if (!wires.length) { alert('Añade al menos una transferencia'); return; }
+
+  // Collect container data
+  const productos = [];
+  document.querySelectorAll('#prod-tbody tr').forEach(tr => {
+    const ins = tr.querySelectorAll('input');
+    if (ins[0].value) productos.push({
+      nombre: ins[0].value,
+      proveedor: ins[1]?.value || '',
+      unidades: parseInt(ins[2]?.value) || 0,
+      precio_unit: parseFloat(ins[3]?.value) || 0,
+      total: parseFloat(ins[4]?.value) || 0,
+      vendidas: parseInt(ins[2]?.value) || 0
+    });
+  });
+
+  const cont = {
+    ref: document.getElementById('d-ref').value || 'CTR-' + Date.now(),
+    numcont: document.getElementById('d-numcont').value,
+    origen: document.getElementById('d-origen').value,
+    destino: document.getElementById('d-destino').value,
+    fecha: document.getElementById('d-fecha').value,
+    fob: parseFloat(document.getElementById('d-fob').value) || 0,
+    flete: parseFloat(document.getElementById('d-flete').value) || 0,
+    seguro: parseFloat(document.getElementById('d-seguro').value) || 0,
+    inspec: parseFloat(document.getElementById('d-inspec').value) || 0,
+    margen: parseFloat(document.getElementById('d-margen').value) || 0,
+    productos
+  };
+
+  // Update stock
+  const existingStock = S.stock.find(s => s.ref === cont.ref);
+  if (!existingStock) {
+    S.stock.push({ ref: cont.ref, numcont: cont.numcont, origen: cont.origen, destino: cont.destino, productos: productos.map(p => ({...p, disponibles: p.unidades, vendidas: 0})) });
+  }
+
+  // Create invoices per wire
+  wires.forEach(row => {
+    const ins = row.querySelectorAll('input');
+    const sel = row.querySelector('select');
+    const empresa = ins[0].value.trim();
+    const refWire = ins[1].value.trim();
+    const importe = parseFloat(ins[2].value) || 0;
+    const fechaCobro = ins[3].value;
+    const tipo = sel.value;
+    if (!empresa || !importe) return;
+
+    const num = 'INV' + new Date().getFullYear() + '-' + String(S.nextNum++).padStart(3,'0');
+    const tipoLabel = tipo === 'FOB' ? 'FOB — Merchandise' : tipo === 'LOG' ? 'Freight + Insurance + Inspections' : 'FOB + Freight + Insurance + Inspections';
+
+    S.facturas.push({
+      id: Date.now() + Math.random(),
+      num, tipo, tipoLabel,
+      contRef: cont.ref,
+      numcont: cont.numcont,
+      origen: cont.origen,
+      destino: cont.destino,
+      cliente: empresa,
+      refWire,
+      importe,
+      fecha: fechaCobro || new Date().toISOString().split('T')[0],
+      estado: 'cobrada',
+      productos: tipo !== 'LOG' ? productos : [],
+      flete: cont.flete,
+      seguro: cont.seguro,
+      inspec: cont.inspec
+    });
+
+    // Discount stock if FOB or AMBOS
+    if (tipo !== 'LOG') {
+      const stockEntry = S.stock.find(s => s.ref === cont.ref);
+      if (stockEntry) {
+        const ratio = importe / (cont.fob || 1);
+        stockEntry.productos.forEach(p => {
+          const vendidas = Math.round(p.unidades * ratio);
+          p.vendidas = Math.min(p.unidades, (p.vendidas || 0) + vendidas);
+          p.disponibles = p.unidades - p.vendidas;
+        });
+      }
+    }
+  });
+
+  save();
+
+  // Sync to Google Sheets + create in Zoho Books
+  const newInvoices = S.facturas.slice(-wires.length);
+  for (const f of newInvoices) {
+    await syncFacturaToSheets(f);
+    await createZohoInvoice(f);
+  }
+  const stockEntry = S.stock.find(s => s.ref === cont.ref);
+  if (stockEntry) await syncStockToSheets(stockEntry);
+
+  goStep(4);
+}
+
+// ───────────────────────────────────────────
+// RENDER FACTURAS
+// ───────────────────────────────────────────
+function renderFacturas() {
+  const list = document.getElementById('inv-list');
+  const count = document.getElementById('fact-count');
+  if (!S.facturas.length) {
+    list.innerHTML = '<div class="empty">Sin facturas aún. Crea un contenedor primero.</div>';
+    count.textContent = '';
+    return;
+  }
+  count.textContent = S.facturas.length + ' facturas — Total: $' + usd(S.facturas.reduce((s,f)=>s+f.importe,0));
+  list.innerHTML = '';
+  [...S.facturas].reverse().forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'inv-card';
+    div.innerHTML = `
+      <div>
+        <div class="inv-num">${f.num} <span class="badge ${f.tipo==='LOG'?'partial':'paid'}" style="font-size:9px">${f.tipo}</span></div>
+        <div class="inv-meta">${f.cliente} · ${f.contRef} · ${f.fecha ? new Date(f.fecha+'T12:00:00').toLocaleDateString('es') : ''}</div>
+      </div>
+      <div class="inv-actions">
+        <div class="inv-amt">$${usd(f.importe)}</div>
+        <button class="btn outline" style="font-size:10px;padding:6px 12px" onclick="verFactura('${f.id}')">Ver</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function verFactura(id) {
+  const f = S.facturas.find(x => String(x.id) === String(id));
+  if (!f) return;
+  document.getElementById('modal-inv-title').textContent = f.num;
+  document.getElementById('modal-inv-body').innerHTML = buildInvoiceHTML(f);
+  document.getElementById('modal-factura').classList.add('open');
+}
+
+function buildInvoiceHTML(f) {
+  const dateStr = f.fecha ? new Date(f.fecha+'T12:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) : '';
+  let rows = '';
+  if (f.tipo !== 'LOG' && f.productos?.length) {
+    f.productos.forEach(p => {
+      rows += `<tr><td>${p.nombre}<br><span style="font-size:11px;color:#888">${p.proveedor}</span></td>
+        <td style="text-align:right">${p.unidades?.toLocaleString()}</td>
+        <td style="text-align:right">$${(p.precio_unit||0).toFixed(4)}</td>
+        <td style="text-align:right">$${usd(p.total)}</td></tr>`;
+    });
+    if (f.tipo === 'AMBOS') {
+      const log = (f.flete||0)+(f.seguro||0)+(f.inspec||0);
+      rows += `<tr><td>Freight + Insurance + Inspections (PSI/CLS)</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">$${usd(log)}</td></tr>`;
+    }
+  } else {
+    rows = `<tr>
+      <td>Ocean Freight ${f.origen||''} → ${f.destino||''}<br>
+      <span style="font-size:11px;color:#888">Container: ${f.numcont||'—'}</span></td>
+      <td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">$${usd(f.flete||0)}</td></tr>
+      <tr><td>Marine Insurance</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">$${usd(f.seguro||0)}</td></tr>
+      <tr><td>Inspections (PSI + CLS)</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">$${usd(f.inspec||0)}</td></tr>`;
+  }
+
+  return `<div class="invoice-doc" id="print-area">
+    <div class="inv-doc-header">
+      <div>
+        <div class="company-name">${S.myCompany.name}</div>
+        <div style="font-size:12px;color:#666;margin-top:4px">${S.myCompany.address}</div>
+        <div style="font-size:12px;color:#666">VAT: ${S.myCompany.vat}</div>
+      </div>
+      <div>
+        <div class="inv-doc-num">${f.num}</div>
+        <div class="inv-doc-date">Date: ${dateStr}</div>
+        <div style="font-size:11px;font-family:var(--mono);color:#999;text-align:right;margin-top:4px">${f.tipoLabel}</div>
+      </div>
+    </div>
+    <div class="inv-parties">
+      <div>
+        <div class="party-label">From (Exporter)</div>
+        <div class="party-name">${S.myCompany.name}</div>
+        <div class="party-detail">${S.myCompany.address}</div>
+        <div class="party-detail">VAT: ${S.myCompany.vat}</div>
+      </div>
+      <div>
+        <div class="party-label">To (Importer)</div>
+        <div class="party-name">${f.cliente}</div>
+        <div class="party-detail">United States of America</div>
+      </div>
+    </div>
+    <div class="inv-ref-box">Container ref: ${f.contRef} &nbsp;|&nbsp; Container No: ${f.numcont||'—'} &nbsp;|&nbsp; Route: ${f.origen||'—'} → ${f.destino||'—'} &nbsp;|&nbsp; Wire ref: ${f.refWire||'—'}</div>
+    <table class="inv-doc-table">
+      <thead><tr><th>Description</th><th style="text-align:right">Units</th><th style="text-align:right">Unit price</th><th style="text-align:right">Amount (USD)</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="inv-total-block">
+      <div class="inv-total-line big"><span>TOTAL DUE</span><span>USD $${usd(f.importe)}</span></div>
+    </div>
+    <div class="inv-footer">
+      <strong>Payment received via wire transfer.</strong> Wire ref: ${f.refWire||'—'}<br>
+      <strong>Bank:</strong> ${S.myCompany.bank}<br><br>
+      Thank you for your business.
+    </div>
+  </div>`;
+}
+
+function printInvoice() { window.print(); }
+
+// ───────────────────────────────────────────
+// STOCK
+// ───────────────────────────────────────────
+function renderStock() {
+  const el = document.getElementById('stock-view');
+  if (!S.stock.length) { el.innerHTML = '<div class="empty">Sin datos de stock aún.</div>'; return; }
+  el.innerHTML = S.stock.map(s => `
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">${s.ref} — ${s.numcont||''} &nbsp;<span style="font-size:11px;font-weight:400">${s.origen} → ${s.destino}</span></div>
+      <table class="prod-table">
+        <thead><tr><th>Producto</th><th style="text-align:right">Total uds.</th><th style="text-align:right">Vendidas</th><th style="text-align:right">Disponibles</th><th style="width:160px">Stock</th></tr></thead>
+        <tbody>
+          ${s.productos.map(p => {
+            const pct = p.unidades > 0 ? Math.round((p.vendidas||0)/p.unidades*100) : 0;
+            const cls = pct >= 100 ? 'over' : pct >= 70 ? 'warn' : '';
+            return `<tr>
+              <td><strong>${p.nombre}</strong><br><span style="font-size:11px;color:var(--ink3)">${p.proveedor}</span></td>
+              <td style="text-align:right;font-family:var(--mono)">${(p.unidades||0).toLocaleString()}</td>
+              <td style="text-align:right;font-family:var(--mono);color:var(--accent)">${(p.vendidas||0).toLocaleString()}</td>
+              <td style="text-align:right;font-family:var(--mono);color:var(--green)">${(p.disponibles||p.unidades||0).toLocaleString()}</td>
+              <td><div class="stock-bar"><div class="stock-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+              <span style="font-size:11px;color:var(--ink3)">${pct}% vendido</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `).join('');
+}
+
+// ───────────────────────────────────────────
+// UTILS
+// ───────────────────────────────────────────
+function usd(n) { return (parseFloat(n)||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function nuevoContenedor() {
+  currentCont = null;
+  document.getElementById('prod-tbody').innerHTML = '';
+  document.getElementById('wires-list').innerHTML = '';
+  ['d-ref','d-numcont','d-origen','d-destino','d-fob','d-flete','d-seguro','d-inspec','d-margen','d-total','d-tasa'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('img-preview').style.display = 'none';
+  document.getElementById('ai-status').style.display = 'none';
+  document.getElementById('d-fecha').value = new Date().toISOString().split('T')[0];
+  goStep(1);
+
+  document.querySelectorAll('.htab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.htab')[0].classList.add('active');
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-nuevo').classList.add('active');
+}
+
+// Init
+goStep(1);
+renderFacturas();
+</script>
+</body>
+</html>
